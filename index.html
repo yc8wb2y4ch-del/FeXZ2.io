@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>铁元素 (Fe) 多模态探究</title>
+    <!-- Chart.js UMD 版本 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-main: #e2e8f0;
+            --text-sub: #94a3b8;
+            --accent-blue: #38bdf8;
+            --accent-red: #f43f5e;
+            --accent-green: #10b981;
+            --accent-yellow: #fbbf24;
+            --atom-orbit: rgba(255, 255, 255, 0.1);
+            --electron-color: #38bdf8;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        h1 {
+            font-weight: 300;
+            letter-spacing: 2px;
+            margin-bottom: 30px;
+            text-align: center;
+            border-bottom: 1px solid var(--accent-blue);
+            padding-bottom: 10px;
+            display: inline-block;
+        }
+
+        /* 通用容器 */
+        .module-container {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            max-width: 1100px;
+            width: 100%;
+            margin-bottom: 30px;
+            box-sizing: border-box;
+            position: relative;
+            transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+
+        /* 视图切换控制 */
+        #exploration-view { display: block; }
+        #verification-view { display: none; opacity: 0; transform: translateY(20px); }
+        #physical-view { display: none; opacity: 0; transform: translateY(20px); }
+        #conclusion-view { display: none; opacity: 0; transform: translateY(20px); }
+
+        /* --- 原子与雷达样式 (保持不变) --- */
+        .top-module { display: flex; flex-wrap: wrap; gap: 40px; align-items: center; }
+        .section-title { width: 100%; font-size: 1.2rem; font-weight: 500; margin-bottom: 10px; color: var(--text-main); border-left: 4px solid var(--accent-blue); padding-left: 10px; }
+        
+        .atom-wrapper { flex: 1; min-width: 300px; display: flex; flex-direction: column; align-items: center; border-right: 1px solid rgba(255,255,255,0.05); padding-right: 20px; }
+        .atom-container { width: 280px; height: 280px; position: relative; display: flex; justify-content: center; align-items: center; margin-top: 20px; }
+        .nucleus { width: 30px; height: 30px; background: radial-gradient(circle, #ff5722 30%, #bf360c 100%); border-radius: 50%; position: absolute; z-index: 10; box-shadow: 0 0 15px #ff5722; display: flex; justify-content: center; align-items: center; font-size: 12px; font-weight: bold; color: white; }
+        .orbit { position: absolute; border: 1px solid var(--atom-orbit); border-radius: 50%; transform-style: preserve-3d; }
+        .electron { position: absolute; width: 8px; height: 8px; background: var(--electron-color); border-radius: 50%; box-shadow: 0 0 8px var(--electron-color); top: 50%; margin-top: -4px; }
+        .orbit-1 { width: 50px; height: 50px; animation: spin 2s linear infinite; }
+        .orbit-2 { width: 90px; height: 90px; animation: spin 3s linear infinite; }
+        .orbit-3 { width: 140px; height: 140px; animation: spin 5s linear infinite; }
+        .orbit-4 { width: 200px; height: 200px; animation: spin 7s linear infinite; }
+        .orbit-1 .electron:nth-child(1) { transform: rotate(0deg) translateX(25px); }
+        .orbit-1 .electron:nth-child(2) { transform: rotate(180deg) translateX(25px); }
+        .orbit-4 .electron:nth-child(1) { transform: rotate(0deg) translateX(100px); }
+        .orbit-4 .electron:nth-child(2) { transform: rotate(180deg) translateX(100px); }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        .radar-wrapper { flex: 1; min-width: 350px; display: flex; flex-direction: column; align-items: center; position: relative; }
+        .chart-container { width: 360px; height: 320px; position: relative; margin: 0 auto; }
+        .radar-label { position: absolute; color: var(--text-sub); font-size: 0.85rem; background: rgba(30, 41, 59, 0.8); padding: 4px 8px; border-radius: 4px; cursor: help; transition: all 0.2s; border: 1px solid transparent; white-space: nowrap; z-index: 20; }
+        .radar-label:hover { color: var(--accent-blue); border-color: var(--accent-blue); background: rgba(30, 41, 59, 1); transform: scale(1.05); z-index: 30; }
+        .lbl-1 { top: 0; left: 50%; transform: translateX(-50%); }
+        .lbl-2 { top: 25%; right: -10px; }
+        .lbl-3 { bottom: 20%; right: -10px; }
+        .lbl-4 { bottom: 20%; left: -10px; }
+        .lbl-5 { top: 25%; left: -10px; }
+
+        .custom-tooltip { position: absolute; background: rgba(15, 23, 42, 0.95); border: 1px solid var(--accent-blue); padding: 15px; border-radius: 8px; color: #fff; width: 260px; pointer-events: none; opacity: 0; transition: opacity 0.2s; z-index: 100; box-shadow: 0 10px 25px rgba(0,0,0,0.5); backdrop-filter: blur(5px); font-size: 0.9rem; line-height: 1.5; }
+        .tooltip-title { color: var(--accent-blue); font-weight: bold; margin-bottom: 5px; display: block; font-size: 1rem; }
+        .tooltip-value { color: #fff; font-weight: bold; background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; margin-left: 8px;}
+        .tooltip-desc { color: var(--text-sub); margin: 8px 0; display: block; font-size: 0.85rem; }
+        .tooltip-logic { color: var(--accent-green); display: block; font-size: 0.85rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px; margin-top: 8px;}
+        .tooltip-logic.loss { color: var(--accent-red); }
+
+        /* --- 交互区域样式 --- */
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 40px; }
+        .stat-item { background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px; text-align: center; }
+        .stat-label { font-size: 0.8rem; color: var(--text-sub); margin-bottom: 5px; }
+        .stat-value { font-size: 1.1rem; font-weight: bold; }
+        
+        .slider-container { position: relative; margin: 40px 0; padding: 0 20px; }
+        input[type=range] { -webkit-appearance: none; width: 100%; height: 12px; border-radius: 6px; background: linear-gradient(90deg, var(--accent-red) 0%, #cbd5e1 50%, var(--accent-green) 100%); outline: none; cursor: pointer; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 28px; height: 28px; border-radius: 50%; background: #fff; cursor: pointer; box-shadow: 0 0 15px rgba(255,255,255,0.5); border: 4px solid var(--card-bg); transition: transform 0.1s; }
+        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.1); }
+        .slider-labels { display: flex; justify-content: space-between; font-weight: bold; margin-top: 15px; font-size: 0.9rem; }
+
+        .btn-confirm { display: block; margin: 20px auto 0; padding: 12px 40px; background: var(--accent-blue); color: #0f172a; border: none; border-radius: 30px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 15px rgba(56, 189, 248, 0.3); }
+        .btn-confirm:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(56, 189, 248, 0.4); }
+        .btn-confirm:disabled { background: var(--text-sub); cursor: not-allowed; transform: none; box-shadow: none; }
+        
+        .btn-next { background: var(--accent-green); color: #fff; animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); } 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); } }
+
+        .feedback-msg { text-align: center; min-height: 20px; margin-bottom: 20px; padding: 15px; border-radius: 8px; display: none; }
+        .feedback-error { background: rgba(244, 63, 94, 0.1); color: var(--accent-red); border: 1px solid var(--accent-red); }
+        .feedback-success { background: rgba(16, 185, 129, 0.1); color: var(--accent-green); border: 1px solid var(--accent-green); }
+
+        .real-marker { position: absolute; top: -40px; left: 20%; transform: translateX(-50%); background: #fff; color: #000; padding: 5px 10px; border-radius: 4px; font-weight: bold; font-size: 0.8rem; opacity: 0; transition: opacity 0.5s; pointer-events: none; }
+        .real-marker::after { content: ''; position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%); border-width: 6px 6px 0; border-style: solid; border-color: #fff transparent transparent transparent; }
+        .real-marker.visible { opacity: 1; }
+
+        /* --- 视频验证模块样式 --- */
+        .video-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-top: 30px;
+        }
+
+        .video-card {
+            background: rgba(0,0,0,0.2);
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .video-container {
+            position: relative;
+            width: 100%;
+            padding-top: 56.25%; /* 16:9 Aspect Ratio */
+            background: #000;
+            overflow: hidden;
+        }
+
+        .video-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+        }
+
+        .video-cover {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 20;
+            transition: opacity 0.3s;
+        }
+        
+        .cover-icon {
+            width: 60px; height: 60px;
+            background: rgba(56, 189, 248, 0.2);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border: 2px solid var(--accent-blue);
+            margin-bottom: 15px;
+            transition: transform 0.2s;
+        }
+        
+        .cover-icon::after {
+            content: '';
+            display: block;
+            width: 0; height: 0;
+            border-left: 18px solid #fff;
+            border-top: 10px solid transparent;
+            border-bottom: 10px solid transparent;
+            margin-left: 4px;
+        }
+
+        .video-cover:hover .cover-icon { transform: scale(1.1); background: var(--accent-blue); }
+        .video-cover p { margin: 0; font-weight: bold; color: #fff; letter-spacing: 1px; }
+
+        video.video-layer {
+            object-fit: contain;
+            pointer-events: auto; 
+        }
+
+        .center-overlay {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 30;
+            cursor: pointer;
+            pointer-events: none;
+        }
+
+        .icon-play-center {
+            width: 50px; height: 50px;
+            background: rgba(0,0,0,0.5);
+            border-radius: 50%;
+            display: none;
+            justify-content: center; align-items: center;
+            border: 2px solid rgba(255,255,255,0.8);
+            backdrop-filter: blur(2px);
+        }
+        .icon-play-center::after {
+            content: ''; display: block; width: 0; height: 0;
+            border-left: 16px solid #fff; border-top: 10px solid transparent; border-bottom: 10px solid transparent; margin-left: 4px;
+        }
+
+        .icon-replay-center {
+            background: var(--accent-blue);
+            color: #000;
+            padding: 10px 25px;
+            border-radius: 25px;
+            font-weight: bold;
+            display: none;
+            pointer-events: auto;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+        .icon-replay-center:hover { background: #fff; }
+
+        .fullscreen-btn {
+            position: absolute;
+            bottom: 10px; right: 10px;
+            width: 32px; height: 32px;
+            background: rgba(0,0,0,0.5);
+            border-radius: 4px;
+            z-index: 30;
+            cursor: pointer;
+            display: none;
+            justify-content: center; align-items: center;
+            color: #fff;
+            font-size: 20px;
+            transition: background 0.2s;
+        }
+        .fullscreen-btn:hover { background: var(--accent-blue); }
+
+        .explanation-box {
+            padding: 20px;
+            background: rgba(56, 189, 248, 0.05);
+            border-top: 2px solid var(--accent-blue);
+            display: none;
+            animation: slideDown 0.5s ease forwards;
+        }
+
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .exp-title { color: var(--accent-blue); font-weight: bold; margin-bottom: 8px; font-size: 1.1rem; }
+        .exp-text { font-size: 0.95rem; line-height: 1.6; color: var(--text-main); }
+        .highlight { color: var(--accent-yellow); font-weight: bold; }
+
+        /* 继续按钮容器 */
+        .continue-container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            margin-top: 30px;
+            opacity: 0;
+            transition: opacity 0.5s;
+            pointer-events: none;
+        }
+        .continue-container.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* 结论页样式 */
+        .summary-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid var(--accent-green);
+        }
+        .summary-card.physical {
+            border-left-color: var(--accent-yellow);
+        }
+        .summary-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #fff;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+        }
+        .summary-icon {
+            width: 24px; height: 24px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 50%;
+            display: flex; justify-content: center; align-items: center;
+            margin-right: 10px;
+            font-size: 14px;
+        }
+
+        @media (max-width: 768px) {
+            .top-module { flex-direction: column; }
+            .atom-wrapper { border-right: none; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 20px; padding-right: 0; }
+            .stats-grid { grid-template-columns: 1fr 1fr; }
+            .chart-container { width: 100%; height: 300px; }
+            .video-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>铁元素 (Fe) 多模态探究</h1>
+
+    <div id="hoverTooltip" class="custom-tooltip"></div>
+
+    <!-- ==================== 阶段一：探索 ==================== -->
+    <div id="exploration-view">
+        <div class="module-container top-module">
+            <div class="atom-wrapper">
+                <div class="section-title">原子结构 (2D)</div>
+                <div class="atom-container">
+                    <div class="nucleus">Fe</div>
+                    <div class="orbit orbit-1"><div class="electron"></div><div class="electron"></div></div>
+                    <div class="orbit orbit-2">
+                        <div class="electron" style="transform: rotate(0deg) translateX(45px)"></div>
+                        <div class="electron" style="transform: rotate(45deg) translateX(45px)"></div>
+                        <div class="electron" style="transform: rotate(90deg) translateX(45px)"></div>
+                        <div class="electron" style="transform: rotate(135deg) translateX(45px)"></div>
+                        <div class="electron" style="transform: rotate(180deg) translateX(45px)"></div>
+                        <div class="electron" style="transform: rotate(225deg) translateX(45px)"></div>
+                        <div class="electron" style="transform: rotate(270deg) translateX(45px)"></div>
+                        <div class="electron" style="transform: rotate(315deg) translateX(45px)"></div>
+                    </div>
+                    <div class="orbit orbit-3">
+                        <div class="electron" style="transform: rotate(0deg) translateX(70px)"></div>
+                        <div class="electron" style="transform: rotate(60deg) translateX(70px)"></div>
+                        <div class="electron" style="transform: rotate(120deg) translateX(70px)"></div>
+                        <div class="electron" style="transform: rotate(180deg) translateX(70px)"></div>
+                        <div class="electron" style="transform: rotate(240deg) translateX(70px)"></div>
+                        <div class="electron" style="transform: rotate(300deg) translateX(70px)"></div>
+                    </div>
+                    <div class="orbit orbit-4"><div class="electron"></div><div class="electron"></div></div>
+                </div>
+            </div>
+
+            <div class="radar-wrapper">
+                <div class="section-title">得失电子影响因子</div>
+                <div class="chart-container">
+                    <canvas id="feRadarChart"></canvas>
+                    <div class="radar-label lbl-1" data-key="radius">原子半径</div>
+                    <div class="radar-label lbl-2" data-key="ionization">第一电离能</div>
+                    <div class="radar-label lbl-3" data-key="electronegativity">电负性</div>
+                    <div class="radar-label lbl-4" data-key="charge">有效核电荷</div>
+                    <div class="radar-label lbl-5" data-key="proximity">最外层趋近度</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="module-container interaction-zone">
+            <h3 style="margin-top:0">得失电子能力确认</h3>
+            <p style="color: var(--text-sub); margin-bottom: 20px;">请根据上方信息，拖动滑块判断铁的化学性质，并点击确认。</p>
+            
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-label">氧化性 (得电子)</div>
+                    <div class="stat-value" id="val-oxidizing" style="color: var(--accent-green)">弱</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">还原性 (失电子)</div>
+                    <div class="stat-value" id="val-reducing" style="color: var(--accent-red)">强</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">化学活泼性</div>
+                    <div class="stat-value" id="val-reactivity" style="color: var(--accent-yellow)">活泼</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">原子稳定性</div>
+                    <div class="stat-value" id="val-stability">不稳定</div>
+                </div>
+            </div>
+
+            <div class="slider-container">
+                <div class="real-marker" id="realMarker">Fe 真实位置</div>
+                <input type="range" min="0" max="100" value="50" id="electronSlider">
+                <div class="slider-labels">
+                    <span style="color: var(--accent-red)">◀ 易失电子 (还原性强)</span>
+                    <span style="color: var(--accent-green)">易得电子 (氧化性强) ▶</span>
+                </div>
+            </div>
+
+            <div class="feedback-msg" id="feedbackBox"></div>
+
+            <button class="btn-confirm" id="confirmBtn">确认性质</button>
+        </div>
+    </div>
+
+    <!-- ==================== 阶段二：化学验证 ==================== -->
+    <div id="verification-view">
+        <div class="module-container">
+            <div class="section-title">化学性质验证</div>
+            <p style="font-size: 1.1rem; line-height: 1.6;">
+                根据得失电子能力的探索，我们确认了铁元素具备 <span style="color:var(--accent-yellow); font-weight:bold;">活泼性</span> 与 <span style="color:var(--accent-red); font-weight:bold;">还原性</span>。<br>
+                请观看下面的实验现象以验证推论。
+            </p>
+
+            <div class="video-grid">
+                <!-- 视频 1 -->
+                <div class="video-card">
+                    <div class="video-container" id="container-1">
+                        <div class="video-cover video-layer" id="cover-1" onclick="activateVideo('1')">
+                            <div class="cover-icon"></div>
+                            <p>实验：铁钉与稀盐酸反应</p>
+                        </div>
+                        <video id="video-1" class="video-layer" playsinline muted>
+                            <source src="https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4" type="video/mp4">
+                        </video>
+                        <div class="center-overlay icon-play-center" id="play-icon-1"></div>
+                        <div class="center-overlay icon-replay-center" id="replay-1" onclick="replayVideo('1')">↺ 重看</div>
+                        <div class="fullscreen-btn" id="fs-1" onclick="toggleFullscreen('1')">⛶</div>
+                    </div>
+                    <div class="explanation-box" id="exp-1">
+                        <div class="exp-title">验证：化学活泼性</div>
+                        <div class="exp-text">
+                            <span class="highlight">现象：</span>铁钉表面产生大量气泡，溶液逐渐变为浅绿色。<br>
+                            <span class="highlight">原理：</span>Fe + 2HCl = FeCl₂ + H₂↑<br>
+                            铁原子轻易失去了2个电子给氢离子，证明了其化学性质<span class="highlight">活泼</span>。
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 视频 2 -->
+                <div class="video-card">
+                    <div class="video-container" id="container-2">
+                        <div class="video-cover video-layer" id="cover-2" onclick="activateVideo('2')">
+                            <div class="cover-icon"></div>
+                            <p>实验：铁丝在氧气中燃烧</p>
+                        </div>
+                        <video id="video-2" class="video-layer" playsinline muted>
+                            <source src="https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4" type="video/mp4">
+                        </video>
+                        <div class="center-overlay icon-play-center" id="play-icon-2"></div>
+                        <div class="center-overlay icon-replay-center" id="replay-2" onclick="replayVideo('2')">↺ 重看</div>
+                        <div class="fullscreen-btn" id="fs-2" onclick="toggleFullscreen('2')">⛶</div>
+                    </div>
+                    <div class="explanation-box" id="exp-2">
+                        <div class="exp-title">验证：强还原性</div>
+                        <div class="exp-text">
+                            <span class="highlight">现象：</span>铁丝在氧气中剧烈燃烧，火星四射。<br>
+                            <span class="highlight">原理：</span>3Fe + 2O₂ = Fe₃O₄ (点燃)<br>
+                            在高温下，铁原子的电子被氧气强行夺走，表现出极强的<span class="highlight">还原性</span>。
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 继续探索按钮 -->
+            <div class="continue-container" id="continue-btn-container-chem">
+                <button class="btn-confirm btn-next" onclick="transitionToPhysical()">继续探索特异物理属性</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== 阶段三：物理属性 ==================== -->
+    <div id="physical-view">
+        <div class="module-container">
+            <div class="section-title">特异物理属性探索</div>
+            <p style="font-size: 1.1rem; line-height: 1.6;">
+                通过对元素的扫描，我们发现铁元素具备 <span style="color:var(--accent-blue); font-weight:bold;">铁磁性</span> 与 <span style="color:var(--accent-yellow); font-weight:bold;">同素异形性</span>。<br>
+                请观看下方视频了解这些特性。
+            </p>
+
+            <div class="video-grid">
+                <!-- 视频 3：铁磁性 -->
+                <div class="video-card">
+                    <div class="video-container" id="container-3">
+                        <div class="video-cover video-layer" id="cover-3" onclick="activateVideo('3')">
+                            <div class="cover-icon"></div>
+                            <p>实验：居里点消失实验</p>
+                        </div>
+                        <video id="video-3" class="video-layer" playsinline muted>
+                            <source src="https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4" type="video/mp4">
+                        </video>
+                        <div class="center-overlay icon-play-center" id="play-icon-3"></div>
+                        <div class="center-overlay icon-replay-center" id="replay-3" onclick="replayVideo('3')">↺ 重看</div>
+                        <div class="fullscreen-btn" id="fs-3" onclick="toggleFullscreen('3')">⛶</div>
+                    </div>
+                    <div class="explanation-box" id="exp-3">
+                        <div class="exp-title">属性：铁磁性</div>
+                        <div class="exp-text">
+                            这个案例说明了铁磁性是铁元素原子排列的一种状态属性。剧烈加热增加了原子的热运动，破坏了铁原子磁矩的整齐排列。<br>
+                            <span class="highlight">结论：</span>铁元素的磁性不是永恒的物质标签，而是与其原子内部电子自旋排列紧密相关的物理特性。
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 视频 4：同素异形性 -->
+                <div class="video-card">
+                    <div class="video-container" id="container-4">
+                        <div class="video-cover video-layer" id="cover-4" onclick="activateVideo('4')">
+                            <div class="cover-icon"></div>
+                            <p>实验：钢铁的淬火</p>
+                        </div>
+                        <video id="video-4" class="video-layer" playsinline muted>
+                            <source src="https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4" type="video/mp4">
+                        </video>
+                        <div class="center-overlay icon-play-center" id="play-icon-4"></div>
+                        <div class="center-overlay icon-replay-center" id="replay-4" onclick="replayVideo('4')">↺ 重看</div>
+                        <div class="fullscreen-btn" id="fs-4" onclick="toggleFullscreen('4')">⛶</div>
+                    </div>
+                    <div class="explanation-box" id="exp-4">
+                        <div class="exp-title">属性：同素异形性</div>
+                        <div class="exp-text">
+                            这个案例说明了铁元素具有通过改变原子空间结构（如从体心立方转变为面心立方）来大幅调整自身物理硬度的能力。<br>
+                            <span class="highlight">结论：</span>这也是铁能够成为人类历史上最重要的结构材料（钢）的基础。
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 结论按钮 -->
+            <div class="continue-container" id="continue-btn-container-phys">
+                <button class="btn-confirm btn-next" onclick="transitionToConclusion()">得出元素性质结论</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== 阶段四：结论 ==================== -->
+    <div id="conclusion-view">
+        <div class="module-container">
+            <div class="section-title">元素性质结论汇总</div>
+            
+            <!-- 化学结论 -->
+            <h3 style="color: var(--accent-green); margin-bottom: 15px;">得失电子能力结论 (化学性质)</h3>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-label">氧化性</div>
+                    <div class="stat-value" style="color: var(--accent-green)">弱</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">还原性</div>
+                    <div class="stat-value" style="color: var(--accent-red)">强</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">化学活泼性</div>
+                    <div class="stat-value" style="color: var(--accent-yellow)">活泼</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">原子稳定性</div>
+                    <div class="stat-value">不稳定</div>
+                </div>
+            </div>
+            <p style="color: var(--text-sub); margin-bottom: 40px; padding: 15px; background: rgba(255,255,255,0.05); border-radius: 8px;">
+                <strong>总结：</strong> 铁原子半径较大，电离能较低，且最外层仅有2个电子。这决定了它在化学反应中极易失去电子，表现出<strong>强还原性</strong>和<strong>高化学活泼性</strong>。
+            </p>
+
+            <!-- 物理结论 -->
+            <h3 style="color: var(--accent-blue); margin-bottom: 15px;">特异物理性质结论</h3>
+            <div class="video-grid">
+                <div class="summary-card physical">
+                    <div class="summary-title"><div class="summary-icon">磁</div> 铁磁性</div>
+                    <div class="exp-text">
+                        源于原子内部电子自旋的整齐排列。这种排列受温度影响（居里点），证明磁性是物质的一种热力学状态。
+                    </div>
+                </div>
+                <div class="summary-card physical">
+                    <div class="summary-title"><div class="summary-icon">构</div> 同素异形性</div>
+                    <div class="exp-text">
+                        铁原子能在不同温度下改变晶体结构（体心/面心立方）。这种结构的可变性是钢铁热处理（如淬火）的物理基础。
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            
+            // --- Stage 1: 逻辑保持不变 ---
+            const ctx = document.getElementById('feRadarChart').getContext('2d');
+            const radarChart = new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: ['','','','',''],
+                    datasets: [{
+                        label: '铁 (Fe) 指标强度',
+                        data: [8, 3, 3, 5, 2],
+                        fill: true,
+                        backgroundColor: 'rgba(56, 189, 248, 0.2)',
+                        borderColor: 'rgba(56, 189, 248, 1)',
+                        pointBackgroundColor: '#fff',
+                        pointBorderColor: 'rgba(56, 189, 248, 1)',
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    layout: { padding: 20 },
+                    scales: {
+                        r: {
+                            angleLines: { color: 'rgba(255, 255, 255, 0.1)' },
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            pointLabels: { display: false },
+                            ticks: { display: false, max: 10, min: 0 }
+                        }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+
+            const dimensionData = {
+                "radius": { title: "原子半径", value: "126 pm (较大)", desc: "原子核到最外层电子的距离。", logic: "半径越大，核对外层电子的束缚越弱 → 越容易失去电子。", type: "loss" },
+                "ionization": { title: "第一电离能", value: "762.5 kJ/mol (较低)", desc: "强行拔走一个最外层电子所需的能量。", logic: "能耗越低，说明电子越容易被拔走 → 失电子倾向强。", type: "loss" },
+                "electronegativity": { title: "电负性", value: "1.83 (鲍林标度)", desc: "原子在化合物中吸引电子的能力。", logic: "数值较低（<2.0），说明它对电子的渴望不强 → 得电子倾向弱。", type: "loss" },
+                "charge": { title: "有效核电荷", value: "Zeff ≈ 6.25", desc: "原子核对最外层电子的实际吸引力。", logic: "吸引力中等，但不足以抵消大半径带来的疏离感。", type: "neutral" },
+                "proximity": { title: "最外层趋近度", value: "2 / 8 (4s²)", desc: "最外层电子数相对于稳定八隅体结构的接近程度。", logic: "只有2个电子，远少于8个。相比于找6个电子填满，失去2个电子更容易。", type: "loss" }
+            };
+
+            const tooltip = document.getElementById('hoverTooltip');
+            const labels = document.querySelectorAll('.radar-label');
+
+            labels.forEach(label => {
+                label.addEventListener('mouseenter', (e) => {
+                    const key = label.getAttribute('data-key');
+                    const data = dimensionData[key];
+                    tooltip.innerHTML = `<span class="tooltip-title">${data.title} <span class="tooltip-value">${data.value}</span></span><span class="tooltip-desc">${data.desc}</span><span class="tooltip-logic ${data.type === 'loss' ? 'loss' : ''}">推导：${data.logic}</span>`;
+                    tooltip.style.opacity = '1';
+                    const rect = label.getBoundingClientRect();
+                    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+                    let topPos = rect.top + scrollTop - 10;
+                    let leftPos = rect.left + (rect.width / 2);
+                    if (topPos < 150) { tooltip.style.transform = "translate(-50%, 20px)"; } else { tooltip.style.transform = "translate(-50%, -100%)"; }
+                    tooltip.style.top = topPos + 'px';
+                    tooltip.style.left = leftPos + 'px';
+                });
+                label.addEventListener('mouseleave', () => { tooltip.style.opacity = '0'; });
+            });
+
+            const slider = document.getElementById('electronSlider');
+            const valOxid = document.getElementById('val-oxidizing');
+            const valReduc = document.getElementById('val-reducing');
+            const valReact = document.getElementById('val-reactivity');
+            const valStab = document.getElementById('val-stability');
+            const confirmBtn = document.getElementById('confirmBtn');
+
+            function getLevel(val, type) {
+                if (type === 'loss') { if (val < 20) return "极强"; if (val < 40) return "强"; if (val < 60) return "中等"; if (val < 80) return "弱"; return "极弱"; }
+                else if (type === 'gain') { if (val > 80) return "极强"; if (val > 60) return "强"; if (val > 40) return "中等"; if (val > 20) return "弱"; return "极弱"; }
+                else if (type === 'active') { let dist = Math.abs(val - 50); if (dist > 35) return "非常活泼"; if (dist > 20) return "活泼"; if (dist > 10) return "一般"; return "惰性"; }
+                else if (type === 'stable') { let dist = Math.abs(val - 50); if (dist < 15) return "稳定"; if (dist < 30) return "一般"; return "不稳定"; }
+            }
+
+            function updateStats() {
+                const val = parseInt(slider.value);
+                valReduc.innerText = getLevel(val, 'loss');
+                valOxid.innerText = getLevel(val, 'gain');
+                valReact.innerText = getLevel(val, 'active');
+                valStab.innerText = getLevel(val, 'stable');
+            }
+            slider.addEventListener('input', updateStats);
+            updateStats();
+
+            let wrongAttempts = 0;
+            const correctRangeMax = 35;
+            const realFeValue = 20;
+
+            confirmBtn.addEventListener('click', checkProperties);
+
+            function checkProperties() {
+                const val = parseInt(slider.value);
+                const feedback = document.getElementById('feedbackBox');
+                const marker = document.getElementById('realMarker');
+
+                feedback.style.display = 'block';
+                feedback.className = 'feedback-msg';
+
+                if (val <= correctRangeMax) {
+                    handleSuccess(feedback, marker, confirmBtn);
+                } else {
+                    wrongAttempts++;
+                    if (wrongAttempts >= 3) {
+                        handleGiveUp(feedback, marker, confirmBtn);
+                    } else {
+                        handleError(feedback);
+                    }
+                }
+            }
+
+            function handleError(el) {
+                el.classList.add('feedback-error');
+                el.innerHTML = `<strong>判断偏差</strong><br>当前选择显示铁倾向于“${parseInt(slider.value) > 50 ? '得电子' : '保持中立'}”。请再次查看雷达图上的“原子半径”和“最外层趋近度”。`;
+            }
+
+            function prepareNextStep(btn) {
+                btn.innerText = "进入化学性质验证";
+                btn.classList.add('btn-next');
+                btn.disabled = false;
+                btn.removeEventListener('click', checkProperties);
+                btn.addEventListener('click', transitionToVerification);
+            }
+
+            function handleSuccess(el, marker, btn) {
+                el.classList.add('feedback-success');
+                marker.classList.add('visible');
+                smoothSlideTo(realFeValue);
+                el.innerHTML = `<strong>判断正确！</strong><br>铁 (Fe) 原子半径大、最外层仅2个电子，极易失去电子，表现出<strong>强还原性</strong>。`;
+                slider.disabled = true;
+                prepareNextStep(btn);
+            }
+
+            function handleGiveUp(el, marker, btn) {
+                el.classList.add('feedback-error');
+                marker.classList.add('visible');
+                smoothSlideTo(realFeValue);
+                el.innerHTML = `<strong>探索结束：揭示真相</strong><br>铁极易失去电子，是典型的还原剂。`;
+                slider.disabled = true;
+                prepareNextStep(btn);
+            }
+
+            function smoothSlideTo(target) {
+                const current = parseInt(slider.value);
+                if (current === target) return;
+                const step = current < target ? 1 : -1;
+                const interval = setInterval(() => {
+                    if (parseInt(slider.value) === target) { clearInterval(interval); updateStats(); } 
+                    else { slider.value = parseInt(slider.value) + step; updateStats(); }
+                }, 10);
+            }
+
+            function transitionToVerification() {
+                const view1 = document.getElementById('exploration-view');
+                const view2 = document.getElementById('verification-view');
+                view1.style.opacity = '0';
+                setTimeout(() => {
+                    view1.style.display = 'none';
+                    view2.style.display = 'block';
+                    void view2.offsetWidth;
+                    view2.style.opacity = '1';
+                    view2.style.transform = 'translateY(0)';
+                }, 500);
+            }
+
+            // --- Stage 2, 3, 4: 视频与页面流转 ---
+
+            // 进度追踪
+            let chemVideo1Done = false;
+            let chemVideo2Done = false;
+            let physVideo3Done = false;
+            let physVideo4Done = false;
+
+            window.activateVideo = function(id) {
+                const cover = document.getElementById(`cover-${id}`);
+                const video = document.getElementById(`video-${id}`);
+                const fsBtn = document.getElementById(`fs-${id}`);
+                const playIcon = document.getElementById(`play-icon-${id}`);
+
+                cover.style.opacity = '0';
+                setTimeout(() => cover.style.display = 'none', 300);
+                fsBtn.style.display = 'flex';
+
+                video.onclick = function() { togglePlay(id); };
+
+                video.play().catch(e => {
+                    console.log("Autoplay blocked", e);
+                    playIcon.style.display = 'flex';
+                });
+
+                video.onplay = () => playIcon.style.display = 'none';
+                video.onpause = () => playIcon.style.display = 'flex';
+                
+                video.onended = () => {
+                    document.getElementById(`replay-${id}`).style.display = 'block';
+                    document.getElementById(`exp-${id}`).style.display = 'block';
+                    playIcon.style.display = 'none';
+                    
+                    // 检查进度
+                    checkProgress(id);
+                };
+            };
+
+            function checkProgress(id) {
+                if (id === '1') chemVideo1Done = true;
+                if (id === '2') chemVideo2Done = true;
+                if (id === '3') physVideo3Done = true;
+                if (id === '4') physVideo4Done = true;
+
+                // 阶段2 -> 阶段3
+                if (chemVideo1Done && chemVideo2Done) {
+                    const btnContainer = document.getElementById('continue-btn-container-chem');
+                    btnContainer.classList.add('show');
+                }
+
+                // 阶段3 -> 阶段4
+                if (physVideo3Done && physVideo4Done) {
+                    const btnContainer = document.getElementById('continue-btn-container-phys');
+                    btnContainer.classList.add('show');
+                }
+            }
+
+            window.transitionToPhysical = function() {
+                const view2 = document.getElementById('verification-view');
+                const view3 = document.getElementById('physical-view');
+                
+                view2.style.opacity = '0';
+                setTimeout(() => {
+                    view2.style.display = 'none';
+                    view3.style.display = 'block';
+                    void view3.offsetWidth;
+                    view3.style.opacity = '1';
+                    view3.style.transform = 'translateY(0)';
+                }, 500);
+            };
+
+            window.transitionToConclusion = function() {
+                const view3 = document.getElementById('physical-view');
+                const view4 = document.getElementById('conclusion-view');
+                
+                view3.style.opacity = '0';
+                setTimeout(() => {
+                    view3.style.display = 'none';
+                    view4.style.display = 'block';
+                    void view4.offsetWidth;
+                    view4.style.opacity = '1';
+                    view4.style.transform = 'translateY(0)';
+                }, 500);
+            };
+
+            window.togglePlay = function(id) {
+                const video = document.getElementById(`video-${id}`);
+                if (video.paused || video.ended) {
+                    video.play();
+                } else {
+                    video.pause();
+                }
+            };
+
+            window.replayVideo = function(id) {
+                const video = document.getElementById(`video-${id}`);
+                const replayBtn = document.getElementById(`replay-${id}`);
+                replayBtn.style.display = 'none';
+                video.currentTime = 0;
+                video.play();
+            };
+
+            window.toggleFullscreen = function(id) {
+                const video = document.getElementById(`video-${id}`);
+                if (video.requestFullscreen) {
+                    video.requestFullscreen();
+                } else if (video.webkitRequestFullscreen) {
+                    video.webkitRequestFullscreen();
+                } else if (video.msRequestFullscreen) {
+                    video.msRequestFullscreen();
+                }
+            };
+        });
+    </script>
+</body>
+</html>
